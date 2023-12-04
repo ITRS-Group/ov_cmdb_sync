@@ -233,15 +233,15 @@ class Host:
         )
 
 
-def opsview_host_list(client) -> opsview.HostList:
+def opsview_host_list(client, instance_url) -> opsview.HostList:
     """Return a list of Opsview Hosts from ServiceNow."""
     logging.debug("Generating Opsview Host List from ServiceNow CMDB")
 
     snow_assets = get_hosts(client)
+    logging.info(
+        "Number of valid Opsview hosts found in ServiceNow instance '%s': %s",
+        instance_url,
+        len(snow_assets),
+    )
 
     return opsview.HostList([Host(asset).as_opsview_host() for asset in snow_assets])
-
-
-def instance_from_url(url: str) -> str:
-    """Return the instance from a ServiceNow URL."""
-    return urlsplit(url).netloc

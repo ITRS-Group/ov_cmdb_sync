@@ -10,6 +10,7 @@ import socket
 from datetime import datetime
 
 import requests
+from urllib.parse import urlsplit
 
 
 def mixed_to_upper_underscore(mixed_str):
@@ -123,7 +124,7 @@ def parse_args():
         "-f",
         "--force",
         action="store_true",
-        help="Don't stop if there are pending changes in Opsview",
+        help="Don't stop if there are pending changes in Opsview and assume yes to all questions",
     )
     parser.add_argument(
         "-l",
@@ -167,3 +168,8 @@ def test_connection(url):
         logging.error("Failed to connect to %s", url)
         logging.error(response.json())
         sys.exit(1)
+
+
+def snow_instance_from_url(url: str) -> str:
+    """Return the instance from a ServiceNow URL."""
+    return urlsplit(url).netloc

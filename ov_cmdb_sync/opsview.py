@@ -335,22 +335,16 @@ class ObjectList:
     def as_json(self, shallow=False):
         return {"list": [obj.as_json(shallow=shallow) for obj in self.objects]}
 
-    def create(self, session: Session, dry_run=False):
+    def create(self, session: Session):
         """Create the objects in Opsview."""
-        return self.create_objects(session, self.url, dry_run)
+        return self.create_objects(session, self.url)
 
     def copy(self):
         """Return a copy of the list of objects."""
         return type(self)(self.objects.copy())
 
-    def create_objects(self, session: Session, object_url, dry_run=False):
+    def create_objects(self, session: Session, object_url):
         """Create the objects in Opsview."""
-        if dry_run:
-            logging.info(
-                "Dry run enabled. Skipping creation of %s", type(self).__name__
-            )
-            return None
-
         if not self.process(session):
             return None
 
@@ -366,8 +360,8 @@ class ObjectList:
                 for variable in host.hostattributes:
                     variables.append_object(Variable(variable.name, ""))
 
-            hostgroups.create(session, dry_run=dry_run)
-            variables.create(session, dry_run=dry_run)
+            hostgroups.create(session)
+            variables.create(session)
 
         data = self.as_json(shallow=True)
 
@@ -1538,7 +1532,9 @@ class HostList(ObjectList):
 
     def delete(self, session: Session):
         """Delete the hosts in Opsview."""
-        logging.info("Number of hosts to delete in Opsview: %s", len(self))
+        if not self.objects:
+            return
+
         for host in self.objects:
             logging.info("Deleting host '%s'", host.name)
 
@@ -1607,11 +1603,16 @@ class HostList(ObjectList):
         force=False,
     ):
         """Sync the list of Opsview hosts with a list of ServiceNow hosts."""
-        logging.info("Syncing Opsview hosts with ServiceNow objects")
+        logging.debug("Syncing Opsview hosts with ServiceNow objects")
 
         if not instance:
             raise ValueError("The 'instance' attribute is missing or empty.")
+        else:
+            instance = util.snow_instance_from_url(util.with_https(instance))
 
+        # This scenario handles the case where ServiceNow reports no hosts to
+        # monitor. In this case, we want to remove all Opsview hosts that
+        # originate from the ServiceNow instance.
         if not snow_hosts:
             logging.debug(
                 f"No ServiceNow hosts found, "
@@ -1619,45 +1620,38 @@ class HostList(ObjectList):
             )
 
             if dry_run:
-                logging.info("Dry run: Would have removed all Opsview hosts")
+                logging.info("Dry run: Would have removed ALL Opsview hosts")
                 return
             else:
                 if not force:
                     answer = input(
-                        f"Are you sure you want to remove all Opsview hosts from the "
+                        f"Are you sure you want to remove ALL Opsview hosts from the "
                         f"instance '{instance}'? [y/N] "
                     )
                     if answer.lower() != "y":
                         logging.info("Aborting")
                         return
 
-                purge_snow_hosts(session, instance)
+                purge_snow_hosts(session, instance, force)
                 return
 
+        # Build up the list of Opsview hosts that originate from the ServiceNow
+        # instance.
         self.from_snow_instance(session, instance)
 
         logging.info(
-            f"Number of Opsview hosts found that come from instance '{instance}': {len(self)}"
+            f"Number of hosts from instance '{instance}' found in Opsview: {len(self)}"
         )
 
         existing_host_names = [host.name for host in self.objects]
 
-        hosts_to_remove = HostList(
+        hosts_to_delete = HostList(
             [
                 host
                 for host in self.objects
                 if host.name not in [snow_host.name for snow_host in snow_hosts]
             ]
         )
-
-        if hosts_to_remove:
-            if dry_run:
-                logging.info(
-                    "Dry run: Would have removed %s hosts", len(hosts_to_remove)
-                )
-            else:
-                logging.info("Removing %s hosts", len(hosts_to_remove))
-                hosts_to_remove.delete(session)
 
         hosts_to_create = HostList(
             [
@@ -1667,14 +1661,22 @@ class HostList(ObjectList):
             ]
         )
 
-        if hosts_to_create:
-            if dry_run:
-                logging.info(
-                    "Dry run: Would have created %s hosts", len(hosts_to_create)
-                )
-            else:
-                logging.info("Creating %s hosts", len(hosts_to_create))
+        if not hosts_to_delete and not hosts_to_create:
+            logging.info("No hosts to delete or create")
+        elif hosts_to_delete:
+            logging.info(
+                "Number of hosts to delete in Opsview: %s", len(hosts_to_delete)
+            )
+            if not dry_run:
+                hosts_to_delete.delete(session)
+        else:
+            logging.info(
+                "Number of hosts to create in Opsview: %s", len(hosts_to_create)
+            )
+            if not dry_run:
                 hosts_to_create.create(session)
+
+        prune_snow_hashtags(session)
 
 
 class HostGroupList(ObjectList):
@@ -2055,8 +2057,9 @@ def purge_snow_hostgroups(session: Session, instance: str):
             raise RequestException(error_msg)
 
 
-def purge_snow_hashtags(session: Session, instance: str):
-    """Remove all hashtags from Opsview that come from ServiceNow."""
+def prune_snow_hashtags(session: Session):
+    """Remove all hashtags from Opsview that are empty or that represent a
+    specific instance."""
     if not hasattr(session, "known_hashtags") or not session.known_hashtags:
         session.populate_known_hashtags()
 
@@ -2064,10 +2067,6 @@ def purge_snow_hashtags(session: Session, instance: str):
     ids_to_delete = []
 
     for hashtag in session.known_hashtags:
-        if hashtag["name"] == instance:
-            hashtags_to_delete.append(hashtag["name"])
-            ids_to_delete.append(hashtag["id"])
-
         if (
             hashtag["description"].startswith("Created by Opsview CMDB Sync")
             and hashtag["hosts"] == []
@@ -2097,15 +2096,11 @@ def purge_snow_hashtags(session: Session, instance: str):
             raise RequestException(error_msg)
 
 
-def purge_snow_hosts(session: Session, instance: str, dry_run=False):
+def purge_snow_hosts(session: Session, instance: str, force=False):
     """Remove all hosts from Opsview that come from a ServiceNow instance."""
     hosts = HostList()
 
     hosts.from_snow_instance(session, instance)
-
-    if dry_run:
-        logging.info("Dry run. Not applying changes.")
-        sys.exit(0)
 
     if hosts:
         response = hosts.delete(session)
@@ -2118,7 +2113,16 @@ def purge_snow_hosts(session: Session, instance: str, dry_run=False):
     else:
         logging.info("Number of hosts to delete in Opsview: 0")
 
-    purge_snow_hashtags(session, instance)
+    if not force:
+        answer = input(
+            f"Are you sure you want to delete ALL objects "
+            f"from the ServiceNow instance '{instance}'? [y/N] "
+        )
+        if answer.lower() != "y":
+            logging.info("Aborting")
+            return
+
+    prune_snow_hashtags(session)
     purge_snow_hostgroups(session, instance)
     purge_root_snow_hostgroup(session)
 

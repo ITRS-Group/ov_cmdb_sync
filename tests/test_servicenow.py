@@ -244,10 +244,10 @@ def test_snow_host_without_asset_tag():
 
 def test_instance_from_url():
     assert (
-        servicenow.instance_from_url("https://dev85142.service-now.com")
+        servicenow.snow_instance_from_url("https://dev85142.service-now.com")
         == "dev85142.service-now.com"
     )
     assert (
-        servicenow.instance_from_url("http://dev85142.service-now.com/")
+        servicenow.snow_instance_from_url("http://dev85142.service-now.com/")
         == "dev85142.service-now.com"
     )

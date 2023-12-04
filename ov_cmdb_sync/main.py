@@ -71,7 +71,7 @@ def main():
     # hosts that come from the ServiceNow CMDB and exit.
 
     if args.purge_snow_instance:
-        opsview.purge_snow_hosts(ov, args.purge_snow_instance)
+        opsview.purge_snow_hosts(ov, args.purge_snow_instance, args.force)
         ov.apply_changes()
         ov.close()
         sys.exit(0)
@@ -92,8 +92,7 @@ def main():
 
     ### Parse ServiceNow CMDB ###
     logging.debug("Getting all hosts from ServiceNow")
-    ov_hosts_in_snow = servicenow.opsview_host_list(snow)
-    logging.info("Found %s Opsview Hosts in ServiceNow", len(ov_hosts_in_snow))
+    ov_hosts_in_snow = servicenow.opsview_host_list(snow, args.snow_url)
 
     if util.is_debug():
         logging.debug("Opsview Hosts in ServiceNow:")
@@ -108,8 +107,9 @@ def main():
     opsview.HostList().sync_from_snow_instance(
         session=ov,
         snow_hosts=ov_hosts_in_snow,
-        instance=servicenow.instance_from_url(util.with_https(args.snow_url)),
+        instance=args.snow_url,
         dry_run=args.dry_run,
+        force=args.force,
     )
 
     if args.dry_run:
