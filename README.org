@@ -1,23 +1,32 @@
 #+title: Opsview CMDB Sync
 
+* Disclaimer
+*ov_cmdb_sync* is pre-release software that is currently under active development.
+
 * Introduction
-ov_cmdb_sync is a tool that performs a one-way sync from a CMDB to Opsview. It is currently designed to work with the ServiceNow CMDB, but could be extended to work with other CMDBs. It is designed to be run as a cron job.
+*ov_cmdb_sync* is a CLI tool that performs a one-way sync from a CMDB to Opsview. It is currently only designed to work with the ServiceNow CMDB, but could in the future be extended to work with other CMDBs.
 
 * Configuration
 ** ServiceNow
-In ServiceNow CMDB, any CI that is to be synced to Opsview must have the mandatory text `OpsviewCollectorCluster=<cluster name>` in the `attributes` field. The cluster name is used to determine which Opsview cluster the CI should be assigned to. The cluster name must match the name of a cluster in the Opsview instance that you are syncing to.
+In ServiceNow CMDB, any CI that should monitored by Opsview must have the mandatory text `OpsviewCollectorCluster=<cluster name>` in the `attributes` field. The cluster name is used to determine which Opsview cluster the CI should be assigned to. The cluster name must match the name of a cluster in the Opsview instance that you are syncing to.
 
-The following options are also available to be set in the `attributes` field:
+The following options are also available to set in the `attributes` field:
 
 - `OpsviewHashtags=<hashtag1>,<hashtag2>,...` - A comma-separated list of hashtags to be applied to the host in Opsview. These hashtags will be applied in addition to the cluster hashtag.
 
 - `OpsviewHostTemplates=<template1>,<template2>,...` - A comma-separated list of host templates to be applied to the host in Opsview.
 
-All of the options should be listed in the `attributes` field in the following format:
+All of the semicolon-separated options in the `attributes` field need to be in the following format:
 
 #+begin_src text
     OpsviewCollectorCluster=Cluster-01;OpsviewHashtags=hashtag1,hashtag2;OpsviewHostTemplates=template1,"template name with spaces"
 #+end_src
+
+Example screenshot:
+#+ATTR_ORG: :width 300
+[[./screenshots/ci_attributes.png]]
+
+This text-based formatting will likely be replaced in the future but works for testing and development purposes.
 
 ** Opsview
 There is nothing to configure in Opsview.
