@@ -28,5 +28,28 @@ Example screenshot:
 
 This text-based formatting will likely be replaced in the future but works for testing and development purposes.
 
+*** Example script to update the attribute field of all CIs with an IP or FQDN
+
+Run at: https://<your-servicenow-instance>/now/nav/ui/classic/params/target/sys.scripts.do
+
+#+begin_src javascript
+var query = 'ip_addressISNOTEMPTY^ip_address!=0.0.0.0^ORfqdnISNOTEMPTY';
+var newAttributesValue = 'OpsviewCollectorCluster=collectors-ny;OpsviewHashtags=TestMulti'
+
+// Create a new GlideRecord for the CMDB table
+var gr = new GlideRecord('cmdb_ci');
+gr.addEncodedQuery(query);
+gr.query();
+
+gs.info('The following CIs will be affected:');
+while (gr.next()) {
+  var ciDetails = 'CI Sys ID: ' + gr.sys_id + ', Name: ' + gr.name + ', IP Address: ' + gr.ip_address + ', FQDN: ' + gr.fqdn;
+  gs.info(ciDetails);
+
+  gr.attributes = newAttributesValue; // Update the attributes field
+  gr.update();
+}
+#+end_src
+
 ** Opsview
 There is nothing to configure in Opsview.
