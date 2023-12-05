@@ -81,12 +81,14 @@ class Session(requests.Session):
 
     def populate_known_bsm_services(self):
         """Populate the set of known bsm service entities."""
+        logging.debug("Getting all BSM services from Opsview")
         self.populate_known_entities(
             "known_bsm_service_names", "known_bsm_services", "name", get_bsm_services
         )
 
     def populate_known_bsm_components(self):
         """Populate the set of known bsm component entities."""
+        logging.debug("Getting all BSM components from Opsview")
         self.populate_known_entities(
             "known_bsm_component_names",
             "known_bsm_components",
@@ -96,12 +98,14 @@ class Session(requests.Session):
 
     def populate_known_hashtags(self):
         """Populate the set of known hashtag entities."""
+        logging.debug("Getting all hashtags from Opsview")
         self.populate_known_entities(
             "known_hashtag_names", "known_hashtags", "name", get_hashtags
         )
 
     def populate_known_host_check_commands(self):
         """Populate the set of known host check command entities."""
+        logging.debug("Getting all host check commands from Opsview")
         self.populate_known_entities(
             "known_host_check_command_names",
             "known_host_check_commands",
@@ -111,24 +115,28 @@ class Session(requests.Session):
 
     def populate_known_hosticons(self):
         """Populate the set of known hosticon entities."""
+        logging.debug("Getting all hosticons from Opsview")
         self.populate_known_entities(
             "known_hosticon_names", "known_hosticons", "name", get_hosticons
         )
 
     def populate_known_hosts(self):
         """Populate the set of known host entities."""
+        logging.debug("Getting all hosts from Opsview")
         self.populate_known_entities(
             "known_host_names", "known_hosts", "name", get_hosts
         )
 
     def populate_known_hostgroups(self):
         """Populate the set of known hostgroup entities."""
+        logging.debug("Getting all hostgroups from Opsview")
         self.populate_known_entities(
             "known_hostgroup_matpaths", "known_hostgroups", "matpath", get_hostgroups
         )
 
     def populate_known_hosttemplates(self):
         """Populate the set of known hosttemplate entities."""
+        logging.debug("Getting all hosttemplates from Opsview")
         self.populate_known_entities(
             "known_hosttemplate_names",
             "known_hosttemplates",
@@ -138,6 +146,7 @@ class Session(requests.Session):
 
     def populate_known_servicechecks(self):
         """Populate the set of known servicecheck entities."""
+        logging.debug("Getting all servicechecks from Opsview")
         self.populate_known_entities(
             "known_servicecheck_names",
             "known_servicechecks",
@@ -147,6 +156,7 @@ class Session(requests.Session):
 
     def populate_known_servicegroups(self):
         """Populate the set of known servicegroup entities."""
+        logging.debug("Getting all servicegroups from Opsview")
         self.populate_known_entities(
             "known_servicegroup_names",
             "known_servicegroups",
@@ -156,12 +166,14 @@ class Session(requests.Session):
 
     def populate_known_timeperiods(self):
         """Populate the set of known timeperiod entities."""
+        logging.debug("Getting all timeperiods from Opsview")
         self.populate_known_entities(
             "known_timeperiod_names", "known_timeperiods", "name", get_timeperiods
         )
 
     def populate_known_variables(self):
         """Populate the set of known variable entities."""
+        logging.debug("Getting all variables from Opsview")
         self.populate_known_entities(
             "known_variable_names", "known_variables", "name", get_variables
         )
@@ -400,7 +412,7 @@ class ObjectList:
         if util.is_debug():
             logging.debug(message)
             for obj in self.objects:
-                logging.debug(pformat(obj.as_json()))
+                logging.debug(pformat(obj))
 
     def handle_response(self, response):
         """Handle the response from Opsview."""
@@ -909,7 +921,7 @@ class Host(Object):
         hostgroup: ForwardRef("HostGroup"),
         hostattributes: ForwardRef("VariableList"),
         collector_cluster: str,
-        hashtags: ForwardRef("HashtagList") = None,
+        hashtags=None,
         host_id=None,
         host_check_command_name: str = "ping",
         host_templates: ForwardRef("HostTemplateList") = None,
@@ -923,12 +935,9 @@ class Host(Object):
 
         self.id = host_id
 
-        if hashtags is None:
-            hashtags = HashtagList()
+        self.hashtags = HashtagList(hashtags)
 
-        self.hashtags = hashtags
-
-        if host_templates is None:
+        if not host_templates:
             host_templates = HostTemplateList()
             host_templates.append_object(HostTemplate("Network - Base"))
 
@@ -939,6 +948,8 @@ class Host(Object):
         self.id = get_host_id(session, self.name)
 
     def as_json(self, shallow=False):
+        logging.debug("Creating JSON for host '%s'", self.name)
+        logging.debug("%s", pformat(getattr(self, "__dict__")))
         return {
             "name": self.name,
             "id": self.id,
