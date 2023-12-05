@@ -75,7 +75,7 @@ def get_hosts(client):
         response.all(),
         desc="Processing ServiceNow Hosts",
         total=response.count,
-        unit="host",
+        unit=" hosts",
     ):
         # logging.debug("Found unit: %s", unit.get("name"))
         if unit.get("ip_address") or unit.get("fqdn"):
