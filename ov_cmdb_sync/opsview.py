@@ -1650,9 +1650,7 @@ class HostList(ObjectList):
         # instance.
         self.from_snow_instance(session, instance)
 
-        logging.info(
-            f"Number of hosts from instance '{instance}' found in Opsview: {len(self)}"
-        )
+        logging.info(f"Hosts from instance '{instance}' found in Opsview: {len(self)}")
 
         existing_host_names = [host.name for host in self.objects]
 
@@ -1675,15 +1673,11 @@ class HostList(ObjectList):
         if not hosts_to_delete and not hosts_to_create:
             logging.info("No hosts to delete or create")
         elif hosts_to_delete:
-            logging.info(
-                "Number of hosts to delete in Opsview: %s", len(hosts_to_delete)
-            )
+            logging.info("Hosts to delete in Opsview: %s", len(hosts_to_delete))
             if not dry_run:
                 hosts_to_delete.delete(session)
         else:
-            logging.info(
-                "Number of hosts to create in Opsview: %s", len(hosts_to_create)
-            )
+            logging.info("Hosts to create in Opsview: %s", len(hosts_to_create))
             if not dry_run:
                 hosts_to_create.create(session)
 
@@ -1972,10 +1966,10 @@ def purge_snow_variables(session: Session):
             ids_to_delete.append(variable["id"])
 
     if not ids_to_delete:
-        logging.info("Number of variables to delete in Opsview: 0")
+        logging.info("Variables to delete in Opsview: 0")
         return
 
-    logging.info("Number of variables to delete in Opsview: %s", len(ids_to_delete))
+    logging.info("Variables to delete in Opsview: %s", len(ids_to_delete))
 
     for variable in variables_to_delete:
         logging.info("Deleting variable '%s'", variable)
@@ -2045,11 +2039,11 @@ def purge_snow_hostgroups(session: Session, instance: str):
             ids_to_delete.append(hostgroup["id"])
 
     if not hostgroups_to_delete:
-        logging.info("Number of hostgroups to delete in Opsview: 0")
+        logging.info("Hostgroups to delete in Opsview: 0")
         return
 
     logging.info(
-        "Number of hostgroups to delete in Opsview: %s",
+        "Hostgroups to delete in Opsview: %s",
         len(hostgroups_to_delete),
     )
 
@@ -2087,10 +2081,10 @@ def prune_snow_hashtags(session: Session):
             ids_to_delete.append(hashtag["id"])
 
     if not hashtags_to_delete:
-        logging.info("Number of hashtags to delete in Opsview: 0")
+        logging.info("Hashtags to delete in Opsview: 0")
         return
 
-    logging.info("Number of hashtags to delete in Opsview: %s", len(hashtags_to_delete))
+    logging.info("Hashtags to delete in Opsview: %s", len(hashtags_to_delete))
 
     for hashtag in hashtags_to_delete:
         logging.info("Deleting hashtag '%s'", hashtag)
@@ -2122,7 +2116,7 @@ def purge_snow_hosts(session: Session, instance: str, force=False):
             sys.exit(1)
 
     else:
-        logging.info("Number of hosts to delete in Opsview: 0")
+        logging.info("Hosts to delete in Opsview: 0")
 
     if not force:
         answer = input(

@@ -239,7 +239,7 @@ def opsview_host_list(client, instance_url) -> opsview.HostList:
 
     snow_assets = get_hosts(client)
     logging.info(
-        "Number of valid Opsview hosts found in ServiceNow instance '%s': %s",
+        "Valid Opsview hosts found in ServiceNow instance '%s': %s",
         instance_url,
         len(snow_assets),
     )
