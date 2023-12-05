@@ -92,7 +92,9 @@ def main():
 
     ### Parse ServiceNow CMDB ###
     logging.debug("Getting all hosts from ServiceNow")
-    ov_hosts_in_snow = servicenow.opsview_host_list(snow, args.snow_url)
+    ov_hosts_in_snow = servicenow.opsview_host_list(
+        snow_client=snow, ov_client=ov, instance_url=args.snow_url
+    )
 
     if util.is_debug():
         logging.debug("Opsview Hosts in ServiceNow:")
@@ -113,7 +115,7 @@ def main():
     )
 
     if args.dry_run:
-        logging.info("Not applying changes.")
+        logging.info("Dry run: Not applying changes")
         sys.exit(0)
 
     # if response and response.status_code != 200:

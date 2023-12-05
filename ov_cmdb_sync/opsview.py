@@ -292,7 +292,7 @@ class Object:
 
     def exists(self, session: Session) -> bool:
         """Check if the object exists in Opsview."""
-        return object_exists(session, self.url, self.name)
+        return object_exists(session, object_url=self.url, object_name=self.name)
 
     def handle_response(self, response):
         """Handle the response from Opsview."""
@@ -470,8 +470,22 @@ class ObjectList:
                 hostgroup.lookup_ref(session)
 
         if isinstance(self, HostList):
+            if (
+                not hasattr(session, "known_hosttemplates")
+                or not session.known_hosttemplates
+            ):
+                session.populate_known_hosttemplates()
+
             for host in self.objects:
                 host.hostgroup.lookup_ref(session)
+                for template in host.hosttemplates:
+                    if template.name not in session.known_hosttemplate_names:
+                        logging.warning(
+                            "Non-existing hosttemplate '%s' for host '%s' will not be created.",
+                            template.name,
+                            host.name,
+                        )
+                        host.hosttemplates.remove(template)
 
         self.without_duplicates()
         self.without_existing(session)
@@ -924,7 +938,7 @@ class Host(Object):
         hashtags=None,
         host_id=None,
         host_check_command_name: str = "ping",
-        host_templates: ForwardRef("HostTemplateList") = None,
+        hosttemplates: ForwardRef("HostTemplateList") = None,
     ):
         self.name = name
         self.ip = ip
@@ -937,11 +951,11 @@ class Host(Object):
 
         self.hashtags = HashtagList(hashtags)
 
-        if not host_templates:
-            host_templates = HostTemplateList()
-            host_templates.append_object(HostTemplate("Network - Base"))
+        if not hosttemplates:
+            hosttemplates = HostTemplateList()
+            hosttemplates.append_object(HostTemplate("Network - Base"))
 
-        self.host_templates = HostTemplateList(host_templates)
+        self.hosttemplates = HostTemplateList(hosttemplates)
 
     def lookup_id(self, session: Session):
         """Get the ID of the host from Opsview."""
@@ -957,8 +971,7 @@ class Host(Object):
             "check_command": self.host_check_command.as_json(shallow=True),
             "hostgroup": {"matpath": self.hostgroup.matpath},
             "hosttemplates": [
-                host_template.as_json(shallow=True)
-                for host_template in self.host_templates
+                template.as_json(shallow=True) for template in self.hosttemplates
             ],
             "hostattributes": [
                 attr.as_json(shallow=True) for attr in self.hostattributes
@@ -1670,16 +1683,25 @@ class HostList(ObjectList):
             ]
         )
 
-        if not hosts_to_delete and not hosts_to_create:
-            logging.info("No hosts to delete or create")
-        elif hosts_to_delete:
-            logging.info("Hosts to delete in Opsview: %s", len(hosts_to_delete))
-            if not dry_run:
-                hosts_to_delete.delete(session)
-        else:
-            logging.info("Hosts to create in Opsview: %s", len(hosts_to_create))
-            if not dry_run:
-                hosts_to_create.create(session)
+        hosts_to_update = HostList(
+            [
+                snow_host
+                for snow_host in snow_hosts
+                if snow_host.name in existing_host_names
+            ]
+        )
+
+        logging.info("Hosts to delete in Opsview: %s", len(hosts_to_delete))
+        logging.info("Hosts to create in Opsview: %s", len(hosts_to_create))
+        logging.info("Hosts to update in Opsview: %s", len(hosts_to_update))
+
+        if dry_run:
+            logging.info("Dry run: Exiting without doing anything")
+            return
+
+        hosts_to_delete.delete(session)
+        hosts_to_create.create(session)
+        # hosts_to_update.update(session)
 
         prune_snow_hashtags(session)
 
@@ -2039,7 +2061,7 @@ def purge_snow_hostgroups(session: Session, instance: str):
             ids_to_delete.append(hostgroup["id"])
 
     if not hostgroups_to_delete:
-        logging.info("Hostgroups to delete in Opsview: 0")
+        logging.debug("Hostgroups to delete in Opsview: 0")
         return
 
     logging.info(
@@ -2081,7 +2103,7 @@ def prune_snow_hashtags(session: Session):
             ids_to_delete.append(hashtag["id"])
 
     if not hashtags_to_delete:
-        logging.info("Hashtags to delete in Opsview: 0")
+        logging.debug("Hashtags to delete in Opsview: 0")
         return
 
     logging.info("Hashtags to delete in Opsview: %s", len(hashtags_to_delete))
@@ -2116,7 +2138,7 @@ def purge_snow_hosts(session: Session, instance: str, force=False):
             sys.exit(1)
 
     else:
-        logging.info("Hosts to delete in Opsview: 0")
+        logging.debug("Hosts to delete in Opsview: 0")
 
     if not force:
         answer = input(
@@ -2151,7 +2173,7 @@ def purge_snow_hosts(session: Session, instance: str, force=False):
 
 def object_exists(session: Session, object_url, object_name) -> bool:
     """Check if an object exists in Opsview."""
-    response = session.get(urljoin(object_url, "exists", object_name))
+    response = session.get(f"{object_url}/exists?name={object_name}")
 
     if response.status_code != 200:
         error_msg = f"Error fetching object: '{response.text}'"

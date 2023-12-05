@@ -229,19 +229,25 @@ class Host:
             collector_cluster=self.collector_cluster,
             hashtags=self.hashtags,
             host_id=None,
-            host_templates=self.host_templates,
+            hosttemplates=self.host_templates,
         )
 
 
-def opsview_host_list(client, instance_url) -> opsview.HostList:
+def opsview_host_list(snow_client, ov_client, instance_url) -> opsview.HostList:
     """Return a list of Opsview Hosts from ServiceNow."""
+    import pprint
+
     logging.debug("Generating Opsview Host List from ServiceNow CMDB")
 
-    snow_assets = get_hosts(client)
+    snow_assets = get_hosts(snow_client)
+    ov_hosts = opsview.HostList(
+        [Host(asset).as_opsview_host() for asset in snow_assets]
+    )
+
     logging.info(
         "Valid Opsview hosts found in ServiceNow instance '%s': %s",
         instance_url,
-        len(snow_assets),
+        len(ov_hosts),
     )
 
-    return opsview.HostList([Host(asset).as_opsview_host() for asset in snow_assets])
+    return ov_hosts
