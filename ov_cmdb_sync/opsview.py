@@ -127,6 +127,13 @@ class Session(requests.Session):
             "known_host_names", "known_hosts", "name", get_hosts
         )
 
+    def populate_known_host_ids(self):
+        """Populate the set of known host IDs."""
+        if not hasattr(self, "known_hosts") or not self.known_hosts:
+            self.populate_known_hosts()
+
+        self.known_host_ids = {host["name"]: host["id"] for host in self.known_hosts}
+
     def populate_known_hostgroups(self):
         """Populate the set of known hostgroup entities."""
         logging.debug("Getting all hostgroups from Opsview")
@@ -185,6 +192,10 @@ class Session(requests.Session):
     def post(self, url, json):
         """Send a POST request to Opsview."""
         return self.client.post(urljoin(self.url, url), json=json)
+
+    def put(self, url, json):
+        """Send a PUT request to Opsview."""
+        return self.client.put(urljoin(self.url, url), json=json)
 
     def delete(self, url):
         """Send a DELETE request to Opsview."""
@@ -962,8 +973,6 @@ class Host(Object):
         self.id = get_host_id(session, self.name)
 
     def as_json(self, shallow=False):
-        logging.debug("Creating JSON for host '%s'", self.name)
-        logging.debug("%s", pformat(getattr(self, "__dict__")))
         return {
             "name": self.name,
             "id": self.id,
@@ -990,6 +999,19 @@ class Host(Object):
 
         logging.debug("Host with name '%s' does not exist", self.name)
         return False
+
+    def update(self, session: Session):
+        """Update the host in Opsview."""
+        # if not self.exists(session):
+        #     logging.warning("Host '%s' does not exist in Opsview", self.name)
+        #     return
+
+        logging.info("Updating host '%s' in Opsview", self.name)
+        logging.debug("Sending data to Opsview:")
+        logging.debug(pformat(self.as_json(shallow=True)))
+
+        response = session.put(f"{self.url}?id={self.id}", self.as_json(shallow=True))
+        self.handle_response(response)
 
 
 class HostGroup(Object):
@@ -1576,6 +1598,17 @@ class HostList(ObjectList):
 
         return response
 
+    def update(self, session: Session):
+        """Update the hosts in Opsview."""
+        if not self.objects:
+            return
+
+        session.populate_known_host_ids()
+
+        for host in self.objects:
+            host.id = session.known_host_ids[host.name]
+            host.update(session)
+
     def from_snow_instance(self, session: Session, instance: str):
         """Get all hosts from Opsview that come from a specific ServiceNow instance."""
         if not instance:
@@ -1701,7 +1734,7 @@ class HostList(ObjectList):
 
         hosts_to_delete.delete(session)
         hosts_to_create.create(session)
-        # hosts_to_update.update(session)
+        hosts_to_update.update(session)
 
         prune_snow_hashtags(session)
 
