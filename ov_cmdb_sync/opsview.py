@@ -1736,7 +1736,11 @@ class HostList(ObjectList):
         hosts_to_create.create(session)
         hosts_to_update.update(session)
 
+        session.populate_known_hashtags()
         prune_snow_hashtags(session)
+
+        session.populate_known_hostgroups()
+        prune_snow_hostgroups(session, instance)
 
 
 class HostGroupList(ObjectList):
@@ -2076,12 +2080,13 @@ def purge_root_snow_hostgroup(session: Session):
             raise RequestException(error_msg)
 
 
-def purge_snow_hostgroups(session: Session, instance: str):
+def prune_snow_hostgroups(session: Session, instance: str):
     """Removing all hostgroups from Opsview that come from ServiceNow."""
     # If the hostgroup matpath starts with "Opsview,ServiceNow,{instance},",
     # then it comes from the ServiceNow instance that we're purging. We need to
     # get all hostgroups first, then filter out the ones that come from the
-    # ServiceNow instance, then delete them.
+    # ServiceNow instance, then delete them if they don't have children or
+    # hosts.
     if not hasattr(session, "known_hostgroups") or not session.known_hostgroups:
         session.populate_known_hostgroups()
 
@@ -2089,7 +2094,9 @@ def purge_snow_hostgroups(session: Session, instance: str):
     ids_to_delete = []
 
     for hostgroup in session.known_hostgroups:
-        if hostgroup["matpath"].startswith(f"Opsview,ServiceNow,{instance},"):
+        if hostgroup["matpath"].startswith(f"Opsview,ServiceNow,{instance},") and (
+            hostgroup["children"] == [] and hostgroup["hosts"] == []
+        ):
             hostgroups_to_delete.append(hostgroup["name"])
             ids_to_delete.append(hostgroup["id"])
 
@@ -2183,7 +2190,7 @@ def purge_snow_hosts(session: Session, instance: str, force=False):
             return
 
     prune_snow_hashtags(session)
-    purge_snow_hostgroups(session, instance)
+    prune_snow_hostgroups(session, instance)
     purge_root_snow_hostgroup(session)
 
     # Only purge variables if there are no more hosts left in Opsview that come
