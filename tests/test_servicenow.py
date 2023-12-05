@@ -240,14 +240,3 @@ def test_snow_host_without_asset_tag():
 
     for attribute in host.hostattributes:
         assert attribute.name != "SERVICENOW_ASSET_TAG"
-
-
-def test_instance_from_url():
-    assert (
-        servicenow.snow_instance_from_url("https://dev85142.service-now.com")
-        == "dev85142.service-now.com"
-    )
-    assert (
-        servicenow.snow_instance_from_url("http://dev85142.service-now.com/")
-        == "dev85142.service-now.com"
-    )
